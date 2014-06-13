@@ -28,6 +28,8 @@
 #include <math.h>
 #include <limits.h>
 #include <signal.h>
+#include <libgen.h> // GCW0: for basename function
+
 #include "libavutil/avstring.h"
 #include "libavutil/colorspace.h"
 #include "libavutil/mathematics.h"
@@ -279,6 +281,10 @@ typedef struct VideoState {
 
     SDL_cond *continue_read_thread;
 } VideoState;
+
+/* GCW0: for bookmark */
+double last_position = 0;
+char *position_filename = NULL;
 
 /* options specified by the user */
 static AVInputFormat *file_iformat;
@@ -1045,6 +1051,29 @@ static void stream_close(VideoState *is)
     av_free(is);
 }
 
+void set_position_filename(char *filename);
+
+void set_position_filename(char *filename)
+{
+    /* GCW0: the last position stored in the $HOME/.config/ffplay/file_settings/filename.pos file */
+    if (filename) {
+        char *home_path;
+
+        home_path = SDL_getenv("HOME");
+        if (home_path) {
+            position_filename = (char*) malloc(strlen(home_path) + strlen("/.config/ffplay/file_settings/") + strlen(basename(filename)) + strlen(".pos") + 1);
+            strcpy(position_filename, home_path);
+            strcat(position_filename, "/.config/ffplay/file_settings/");
+            strcat(position_filename, basename(filename));
+            strcat(position_filename, ".pos");
+        }
+        else
+            position_filename = NULL;
+    }
+    else
+        position_filename = NULL;
+}
+
 static void do_exit(VideoState *is)
 {
     if (is) {
@@ -1056,6 +1085,19 @@ static void do_exit(VideoState *is)
     av_freep(&vfilters);
 #endif
     avformat_network_deinit();
+
+    /* GCW0: write the last position in the file */
+    if (position_filename) {
+        FILE *position_file = fopen(position_filename, "w");
+
+        if (position_file) {
+            fprintf(position_file, "%.0f", last_position);
+            fclose(position_file);
+        }
+
+        free(position_filename);
+    }
+
     if (show_status)
         printf("\n");
     SDL_Quit();
@@ -3175,7 +3217,7 @@ static void event_loop(VideoState *cur_stream)
     for (;;) {
         double x;
         refresh_loop_wait_event(cur_stream, &event);
-		/* GCW0: Added key mapping. See http://wiki.surkow.com/Tutorials:SDL#Buttons */
+        /* GCW0: Added key mapping. See http://wiki.surkow.com/Tutorials:SDL#Buttons */
         switch (event.type) {
         case SDL_KEYDOWN:
             if (exit_on_keydown) {
@@ -3185,6 +3227,7 @@ static void event_loop(VideoState *cur_stream)
             switch (event.key.keysym.sym) {
             case SDLK_ESCAPE:
             case SDLK_q:
+                last_position = get_master_clock(cur_stream); // GCW0: Get position for bookmark
                 do_exit(cur_stream);
                 break;
             case SDLK_f:
@@ -3198,11 +3241,11 @@ static void event_loop(VideoState *cur_stream)
             case SDLK_s: // S: Step to next frame
                 step_to_next_frame(cur_stream);
                 break;
-			case SDLK_TAB: // GCW0: Left shoulder button.
+            case SDLK_TAB: // GCW0: Left shoulder button.
             case SDLK_a:
                 stream_cycle_channel(cur_stream, AVMEDIA_TYPE_AUDIO);
                 break;
-			case SDLK_LCTRL: // GCW0: A button.
+            case SDLK_LCTRL: // GCW0: A button.
             case SDLK_v:
                 stream_cycle_channel(cur_stream, AVMEDIA_TYPE_VIDEO);
                 break;
@@ -3211,11 +3254,11 @@ static void event_loop(VideoState *cur_stream)
                 stream_cycle_channel(cur_stream, AVMEDIA_TYPE_AUDIO);
                 stream_cycle_channel(cur_stream, AVMEDIA_TYPE_SUBTITLE);
                 break;
-			case SDLK_BACKSPACE: // GCW0: Right shoulder button.
+            case SDLK_BACKSPACE: // GCW0: Right shoulder button.
             case SDLK_t:
                 stream_cycle_channel(cur_stream, AVMEDIA_TYPE_SUBTITLE);
                 break;
-			case SDLK_LSHIFT: // GCW0: X button.
+            case SDLK_LSHIFT: // GCW0: X button.
             case SDLK_w:
                 toggle_audio_display(cur_stream);
                 break;
@@ -3624,6 +3667,8 @@ int main(int argc, char **argv)
         av_log(NULL, AV_LOG_FATAL, "Failed to initialize VideoState!\n");
         do_exit(NULL);
     }
+
+    set_position_filename(input_filename);
 
     event_loop(is);
 
