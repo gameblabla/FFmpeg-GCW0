@@ -3175,6 +3175,7 @@ static void event_loop(VideoState *cur_stream)
     for (;;) {
         double x;
         refresh_loop_wait_event(cur_stream, &event);
+		/* GCW0: Added key mapping. See http://wiki.surkow.com/Tutorials:SDL#Buttons */
         switch (event.type) {
         case SDL_KEYDOWN:
             if (exit_on_keydown) {
@@ -3197,9 +3198,11 @@ static void event_loop(VideoState *cur_stream)
             case SDLK_s: // S: Step to next frame
                 step_to_next_frame(cur_stream);
                 break;
+			case SDLK_TAB: // GCW0: Left shoulder button.
             case SDLK_a:
                 stream_cycle_channel(cur_stream, AVMEDIA_TYPE_AUDIO);
                 break;
+			case SDLK_LCTRL: // GCW0: A button.
             case SDLK_v:
                 stream_cycle_channel(cur_stream, AVMEDIA_TYPE_VIDEO);
                 break;
@@ -3208,9 +3211,11 @@ static void event_loop(VideoState *cur_stream)
                 stream_cycle_channel(cur_stream, AVMEDIA_TYPE_AUDIO);
                 stream_cycle_channel(cur_stream, AVMEDIA_TYPE_SUBTITLE);
                 break;
+			case SDLK_BACKSPACE: // GCW0: Right shoulder button.
             case SDLK_t:
                 stream_cycle_channel(cur_stream, AVMEDIA_TYPE_SUBTITLE);
                 break;
+			case SDLK_LSHIFT: // GCW0: X button.
             case SDLK_w:
                 toggle_audio_display(cur_stream);
                 break;
