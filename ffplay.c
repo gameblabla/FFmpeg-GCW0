@@ -3670,6 +3670,20 @@ int main(int argc, char **argv)
 
     set_position_filename(input_filename);
 
+    if (position_filename != NULL) {
+        FILE *position_file = fopen(position_filename, "r");
+        if (position_file) {
+            char time[1024];
+            char c = '\0';
+            int i = 0;
+            while (((c = fgetc (position_file)) != EOF) && (c != '\n') && (c != '\0'))
+                time[i++] = c;
+            time[i]='\0';
+            start_time = parse_time_or_die(NULL, time, 1);
+            fclose(position_file);
+        }
+    }
+
     event_loop(is);
 
     /* never returns */
