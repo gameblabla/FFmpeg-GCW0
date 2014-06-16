@@ -285,6 +285,7 @@ typedef struct VideoState {
 /* GCW0: for bookmark */
 double last_position = 0;
 char *position_filename = NULL;
+int seek_opt_is_used = 0;
 
 /* options specified by the user */
 static AVInputFormat *file_iformat;
@@ -3429,6 +3430,7 @@ static int opt_sync(void *optctx, const char *opt, const char *arg)
 static int opt_seek(void *optctx, const char *opt, const char *arg)
 {
     start_time = parse_time_or_die(opt, arg, 1);
+    seek_opt_is_used = 1; // CGW0: don't use auto bookmark if -ss option is used
     return 0;
 }
 
@@ -3670,17 +3672,19 @@ int main(int argc, char **argv)
 
     set_position_filename(input_filename);
 
-    if (position_filename != NULL) {
-        FILE *position_file = fopen(position_filename, "r");
-        if (position_file) {
-            char time[1024];
-            char c = '\0';
-            int i = 0;
-            while (((c = fgetc (position_file)) != EOF) && (c != '\n') && (c != '\0'))
-                time[i++] = c;
-            time[i]='\0';
-            start_time = parse_time_or_die(NULL, time, 1);
-            fclose(position_file);
+    if (!seek_opt_is_used) { // CGW0: don't use auto bookmark if -ss option is used
+        if (position_filename != NULL) {
+            FILE *position_file = fopen(position_filename, "r");
+            if (position_file) {
+                char time[1024];
+                char c = '\0';
+                int i = 0;
+                while (((c = fgetc (position_file)) != EOF) && (c != '\n') && (c != '\0'))
+                    time[i++] = c;
+                time[i]='\0';
+                start_time = parse_time_or_die(NULL, time, 1);
+                fclose(position_file);
+            }
         }
     }
 
