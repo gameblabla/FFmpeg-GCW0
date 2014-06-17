@@ -3679,8 +3679,14 @@ int main(int argc, char **argv)
                 char time[1024];
                 char c = '\0';
                 int i = 0;
+                int digit_flag = 0;
                 while (((c = fgetc (position_file)) != EOF) && (c != '\n') && (c != '\0'))
-                    time[i++] = c;
+                    if (isdigit(c)) {
+                        time[i++] = c;
+                        digit_flag = 1;
+                    }
+                if (!digit_flag)
+                    time[i++] = '0';
                 time[i]='\0';
                 start_time = parse_time_or_die(NULL, time, 1);
                 fclose(position_file);
