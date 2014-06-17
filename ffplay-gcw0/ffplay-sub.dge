@@ -1,0 +1,137 @@
+#!/bin/sh
+
+#*******************************************************************#
+#       Name:           ffplay-subs.dge                             #
+#       Author:         radon86 gas.radon86@gmail.com               #
+#       Description:    Launches ffplay with subtitles              #
+#       Date:           2014-06-17                                  #
+#*******************************************************************#
+
+export set LD_LIBRARY_PATH=lib
+export set FONTCONFIG_FILE="$(pwd)"/fonts/fonts.conf
+
+# Default arguments for the ffplay
+ARGS='-x 320 -y 240 -fs -autoexit'
+
+#Provide subtitles via video filter: -vf subtitles=
+#+/SUBTITLES/FILE.ass[:originalxsize][:charenc]
+SUB_FILTER='-vf subtitles='
+
+#This is necessary to correctly scale the fonts
+#+if the aspect ratio has been changed. 
+SUB_ORIGINAL_SIZE=':1x1'
+
+input_file="$@"
+if [ ! -r "$input_file" ]
+then
+        echo "Bad input file."
+        exit 1
+fi
+
+ext=""          # input file extention
+filename=""
+subtitles=""    # subtitles file
+sub_count=""    # count of internal subtitles
+sub_size="$SUB_ORIGINAL_SIZE"
+
+#------------------------------------------------------------------------#
+# get_filename_and_extension                                             #
+# Returns filename (with path, if specified) and filename extension.     #
+#------------------------------------------------------------------------#
+get_filename_and_extension ()
+{
+        if [ -n "$@" ]
+        then
+                if [ -d "$@" ]
+                then
+                        ext=""
+                else
+                        # get file's extension
+                        ext=$(echo "$@"|sed 's/.\{1,\}\.//g')
+                fi
+
+                if [ "$ext" = "$1" ]
+                then
+                        ext=""
+                fi
+
+                # get file's name without extension
+#               filename=$(echo $@|sed "s/\.$ext//")
+                filename=$(dirname "$@")/$(basename "$@" .$ext)
+        fi
+}
+
+get_filename_and_extension "$input_file"
+
+# Detect internal subtitles
+sub_count=$(./ffprobe "$input_file" -print_format ini -show_streams 2>/dev/null | grep 'codec_type=subtitle' | wc -l)
+
+if [ -r "$filename.ass" ]
+then
+        subtitles="$filename".ass
+elif [ -r "$filename.srt" ]
+then
+        subtitles="$filename".srt
+elif [ "$sub_count" -gt "0" ]
+then
+        subtitles="$input_file"
+else
+        subtitles=""
+        SUB_FILTER="--"
+        sub_size=""
+fi
+
+# try load configs from the HOME directory
+if [ -d "$HOME" ]
+then
+        mkdir -p "$HOME"/.config/ffplay/file_settings
+        
+        if [ ! -f "$HOME"/.fonts.conf ]
+        then
+                cp "$(pwd)"/fonts/fonts.conf "$HOME"/.fonts.conf
+        fi
+        
+        # fontconfig
+        if [ -r "$HOME"/.fonts.conf ]
+        then
+                export set FONTCONFIG_FILE="$HOME"/.fonts.conf
+        else
+                echo "Unable read $HOME/.fonts.conf"
+        fi
+
+        # try load subtitles aspect ratio from config
+        conf_file="$HOME"/.config/ffplay/ffplay.conf
+        if [ -r $conf_file ]
+        then
+                read variable value <"$conf_file"
+                if [ "$variable" = "SUB_ORIGINAL_SIZE" ]
+                then
+                        sub_size=':'"$value"
+                fi
+        fi
+fi
+
+#---Start of "damn apostrophe in the filename" hack
+apostrophe=0
+is_apostroph=0
+echo "$subtitles" | grep "'"; apostrophe=$? # Is there an apostrophe in the filename?
+echo "apostrophe $apostrophe"
+
+if [ "$apostrophe" -eq "0" ]
+then
+        is_apostrophe=1
+        subtitles_backup="$subtitles"
+        subtitles=$(echo $subtitles | tr \' "|" | sed 's/|//g') # Delete apostrophe from the filename
+        cp "$subtitles_backup" "$subtitles" # Create "apostrophe-free" version of the subtitles file
+fi
+
+#run player
+./ffplay $ARGS $SUB_FILTER\'"$subtitles"\'$sub_size "$input_file"
+
+if [ "$is_apostrophe" -eq "1" ]
+then
+        rm "$subtitles" # Remove copy of the subtitles file
+fi
+#---End of "damn apostrophe in the filename" hack
+
+exit 0

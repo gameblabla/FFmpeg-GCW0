@@ -1,0 +1,6 @@
+FFplay-gcw0 source:
+https://github.com/denis-n-kuznetsov/FFmpeg-GCW0
+
+FFmpeg source:
+https://github.com/FFmpeg/FFmpeg
+http://ffmpeg.org/releases/ffmpeg-2.1.4.tar.gz

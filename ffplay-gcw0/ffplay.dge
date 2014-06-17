@@ -1,0 +1,30 @@
+#!/bin/sh
+
+#*******************************************************************#
+#       Name:           ffplay-subs.dge                             #
+#       Author:         radon86 gas.radon86@gmail.com               #
+#       Description:    Launches ffplay                             #
+#       Date:           2014-06-17                                  #
+#*******************************************************************#
+
+export set LD_LIBRARY_PATH=lib
+
+# Default arguments for the ffplay
+ARGS='-x 320 -y 240 -fs -autoexit'
+
+input_file="$@"
+if [ ! -r "$input_file" ]
+then
+        echo "Bad input file."
+        exit 1
+fi
+
+if [ -d "$HOME" ]
+then
+        mkdir -p "$HOME"/.config/ffplay/file_settings
+fi
+
+# Run player
+./ffplay $ARGS "$input_file"
+
+exit 0
