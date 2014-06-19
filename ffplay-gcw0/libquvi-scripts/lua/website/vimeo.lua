@@ -110,7 +110,7 @@ function Vimeo.get_config(self)
         error( (not s) and "no match: error message" or s )
     end
 
-    return c:match('b=(.-);') or error('no match: b')
+    return c:match(',a=({.-);') or error('no match: b')
 end
 
 function Vimeo.iter_streams(c)
