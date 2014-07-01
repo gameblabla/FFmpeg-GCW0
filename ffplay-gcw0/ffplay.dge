@@ -120,6 +120,11 @@ fi
 if [ -d "$HOME" ]
 then
         mkdir -p "$HOME"/.config/ffplay/file_settings
+
+        if [ ! -d "$HOME/video/Qbertaddict1's YouTube Channel" ]
+        then
+                cp -r "video" "$HOME"
+        fi
 fi
 
 echo "format: $format"
