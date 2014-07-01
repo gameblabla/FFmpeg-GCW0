@@ -8,5 +8,5 @@ Type=Application
 StartupNotify=true
 Icon=ffplay
 Categories=applications;
-MimeType=video/avi;video/mp4;audio/mp4;video/ogg;audio/ogg;video/x-matroska;audio/x-matroska;audio/x-flac;audio/mpeg;video/mpeg;video/x-flv;video/x-ms-asf;video/quicktime;video/3gpp;video/webm;audio/vnd.rn-realaudio;audio/x-pn-realaudio;audio/x-pn-realaudio-plugin;video/vnd.rn-realvideo;application/vnd.rn-realmedia;application/vnd.rn-realmedia-vbr;
+MimeType=video/avi;video/mp4;audio/mp4;video/ogg;audio/ogg;video/x-matroska;audio/x-matroska;audio/x-flac;audio/mpeg;video/mpeg;video/x-flv;video/x-ms-asf;video/quicktime;video/3gpp;video/webm;audio/vnd.rn-realaudio;audio/x-pn-realaudio;audio/x-pn-realaudio-plugin;video/vnd.rn-realvideo;application/vnd.rn-realmedia;application/vnd.rn-realmedia-vbr;audio/x-mpegurl;
 X-OD-Manual=README.txt
