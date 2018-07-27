@@ -28,7 +28,8 @@
 #include <math.h>
 #include <limits.h>
 #include <signal.h>
-#include <libgen.h> // GCW0: for basename function
+
+#undef CONFIG_AVFILTER
 
 #include "libavutil/avstring.h"
 #include "libavutil/colorspace.h"
@@ -54,8 +55,8 @@
 # include "libavfilter/buffersrc.h"
 #endif
 
-#include <SDL.h>
-#include <SDL_thread.h>
+#include <SDL/SDL.h>
+#include <SDL/SDL_thread.h>
 
 #include "cmdutils.h"
 
@@ -283,19 +284,18 @@ typedef struct VideoState {
 } VideoState;
 
 /* GCW0: for bookmark */
-char *position_filename = NULL;
 int seek_opt_is_used = 0;
 
 /* options specified by the user */
 static AVInputFormat *file_iformat;
 static const char *input_filename;
 static const char *window_title;
-static int fs_screen_width;
-static int fs_screen_height;
-static int default_width  = 640;
+static int fs_screen_width = 320;
+static int fs_screen_height = 480;
+static int default_width  = 320;
 static int default_height = 480;
-static int screen_width  = 0;
-static int screen_height = 0;
+static int screen_width  = 320;
+static int screen_height = 480;
 static int audio_disable;
 static int video_disable;
 static int subtitle_disable;
@@ -343,7 +343,7 @@ static AVPacket flush_pkt;
 #define FF_ALLOC_EVENT   (SDL_USEREVENT)
 #define FF_QUIT_EVENT    (SDL_USEREVENT + 2)
 
-static SDL_Surface *screen;
+static SDL_Surface *screen, *rl_screen;
 
 static inline
 int cmp_audio_fmts(enum AVSampleFormat fmt1, int64_t channel_count1,
@@ -868,6 +868,11 @@ static void video_image_display(VideoState *is)
         }
 
         calculate_display_rect(&rect, is->xleft, is->ytop, is->width, is->height, vp);
+        
+        rect.x = 0;
+        rect.y = 0;
+        rect.w = 320;
+        rect.h = 480;
 
         SDL_DisplayYUVOverlay(vp->bmp, &rect);
 
@@ -1134,33 +1139,9 @@ static double get_master_clock(VideoState *is)
     return val;
 }
 
-void set_position_filename(char *filename);
-
-void set_position_filename(char *filename)
-{
-    /* GCW0: the last position stored in the $HOME/.config/ffplay/file_settings/filename.pos file */
-    if (filename) {
-        char *home_path;
-
-        home_path = SDL_getenv("HOME");
-        if (home_path) {
-            position_filename = (char*) malloc(strlen(home_path) + strlen("/.config/ffplay/file_settings/") + strlen(basename(filename)) + strlen(".pos") + 1);
-            strcpy(position_filename, home_path);
-            strcat(position_filename, "/.config/ffplay/file_settings/");
-            strcat(position_filename, basename(filename));
-            strcat(position_filename, ".pos");
-        }
-        else
-            position_filename = NULL;
-    }
-    else
-        position_filename = NULL;
-}
 
 static void do_exit(VideoState *is)
 {
-    double last_position = get_master_clock(is); // GCW0: Get position for bookmark;
-
     if (is) {
         stream_close(is);
     }
@@ -1171,38 +1152,21 @@ static void do_exit(VideoState *is)
 #endif
     avformat_network_deinit();
 
-    /* GCW0: write the last position in the file */
-    if (position_filename) {
-        FILE *position_file = fopen(position_filename, "w");
-
-        if (position_file) {
-            fprintf(position_file, "%.0f", last_position);
-            fclose(position_file);
-        }
-
-        free(position_filename);
-    }
-
     if (show_status)
         printf("\n");
     SDL_Quit();
     av_log(NULL, AV_LOG_QUIET, "%s", "");
-    exit(0);
 }
 
 static void sigterm_handler(int sig)
 {
-    exit(123);
+    exit(0);
 }
 
 static int video_open(VideoState *is, int force_set_video_mode, VideoPicture *vp)
 {
-    int flags = SDL_HWSURFACE | SDL_ASYNCBLIT | SDL_HWACCEL;
     int w,h;
     SDL_Rect rect;
-
-    if (is_full_screen) flags |= SDL_FULLSCREEN;
-    else                flags |= SDL_RESIZABLE;
 
     if (vp && vp->width) {
         calculate_display_rect(&rect, 0, 0, INT_MAX, vp->height, vp);
@@ -1211,27 +1175,17 @@ static int video_open(VideoState *is, int force_set_video_mode, VideoPicture *vp
     }
 
     if (is_full_screen && fs_screen_width) {
-        w = fs_screen_width;
-        h = fs_screen_height;
+        w = 320;
+        h = 480;
     } else if (!is_full_screen && screen_width) {
-        w = screen_width;
-        h = screen_height;
+        w = 320;
+        h = 480;
     } else {
-        w = default_width;
-        h = default_height;
+        w = 320;
+        h = 480;
     }
-    w = FFMIN(16383, w);
-    if (screen && is->width == screen->w && screen->w == w
-       && is->height== screen->h && screen->h == h && !force_set_video_mode)
-        return 0;
-    screen = SDL_SetVideoMode(w, h, 0, flags);
-    if (!screen) {
-        av_log(NULL, AV_LOG_FATAL, "SDL: could not set video mode - exiting\n");
-        do_exit(is);
-    }
-    if (!window_title)
-        window_title = input_filename;
-    SDL_WM_SetCaption(window_title, window_title);
+    screen = SDL_SetVideoMode(320, 480, 16, SDL_HWSURFACE);
+    //screen = SDL_CreateRGBSurface(SDL_HWSURFACE, 320, 240, 16, 0,0,0,0);
 
     is->width  = screen->w;
     is->height = screen->h;
@@ -3596,11 +3550,11 @@ int main(int argc, char **argv)
 {
     int flags;
     VideoState *is;
-    char dummy_videodriver[] = "SDL_VIDEODRIVER=dummy";
+    
+    FILE* fp;
 
-    av_log_set_flags(AV_LOG_SKIP_REPEATED);
-    parse_loglevel(argc, argv, options);
 
+   // av_log_set_flags(AV_LOG_SKIP_REPEATED);
     /* register all codecs, demux and protocols */
     avcodec_register_all();
 #if CONFIG_AVDEVICE
@@ -3611,35 +3565,29 @@ int main(int argc, char **argv)
 #endif
     av_register_all();
     avformat_network_init();
-
     init_opts();
 
     signal(SIGINT , sigterm_handler); /* Interrupt (ANSI).    */
     signal(SIGTERM, sigterm_handler); /* Termination (ANSI).  */
 
     show_banner(argc, argv, options);
-
     parse_options(NULL, argc, argv, options, opt_input_file);
+
 
     if (!input_filename) {
         show_usage();
         av_log(NULL, AV_LOG_FATAL, "An input file must be specified\n");
         av_log(NULL, AV_LOG_FATAL,
-               "Use -h to get full help or, even better, run 'man %s'\n", program_name);
+				"Use -h to get full help or, even better, run 'man %s'\n", program_name);
         exit(1);
     }
 
-    if (display_disable) {
-        video_disable = 1;
-    }
     flags = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER;
-    if (audio_disable)
-        flags &= ~SDL_INIT_AUDIO;
-    if (display_disable)
-        SDL_putenv(dummy_videodriver); /* For the event queue, we always need a video driver. */
+/*
 #if !defined(__MINGW32__) && !defined(__APPLE__)
-    flags |= SDL_INIT_EVENTTHREAD; /* Not supported on Windows or Mac OS X */
+    flags |= SDL_INIT_EVENTTHREAD;
 #endif
+*/
     if (SDL_Init (flags)) {
         av_log(NULL, AV_LOG_FATAL, "Could not initialize SDL - %s\n", SDL_GetError());
         av_log(NULL, AV_LOG_FATAL, "(Did you set the DISPLAY variable?)\n");
@@ -3647,9 +3595,8 @@ int main(int argc, char **argv)
     }
 
     if (!display_disable) {
-        const SDL_VideoInfo *vi = SDL_GetVideoInfo();
-        fs_screen_width = vi->current_w;
-        fs_screen_height = vi->current_h;
+        fs_screen_width = 320;
+        fs_screen_height = 480;
     }
 
     SDL_EventState(SDL_ACTIVEEVENT, SDL_IGNORE);
@@ -3669,31 +3616,7 @@ int main(int argc, char **argv)
         av_log(NULL, AV_LOG_FATAL, "Failed to initialize VideoState!\n");
         do_exit(NULL);
     }
-
-    set_position_filename(input_filename);
-
-    if (!seek_opt_is_used) { // CGW0: don't use auto bookmark if -ss option is used
-        if (position_filename != NULL) {
-            FILE *position_file = fopen(position_filename, "r");
-            if (position_file) {
-                char time[1024];
-                char c = '\0';
-                int i = 0;
-                int digit_flag = 0;
-                while (((c = fgetc (position_file)) != EOF) && (c != '\n') && (c != '\0'))
-                    if (isdigit(c)) {
-                        time[i++] = c;
-                        digit_flag = 1;
-                    }
-                if (!digit_flag)
-                    time[i++] = '0';
-                time[i]='\0';
-                start_time = parse_time_or_die(NULL, time, 1);
-                fclose(position_file);
-            }
-        }
-    }
-
+    
     event_loop(is);
 
     /* never returns */

@@ -1,0 +1,4 @@
+# Video is at 320x240
+# Not using CARBAC
+
+ffmpeg -i source_video.mp4 -tune fastdecode -maxrate 8M -r 24 -crf 32 -s 320x240 -aspect 320:240 -bf 0 output.mp4
